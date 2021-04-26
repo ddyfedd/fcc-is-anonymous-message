@@ -50,6 +50,53 @@ module.exports = function (app) {
     });
   });
   
+  app.post('/api/replies/:board', (req, res) => {
+    let newReply = new Reply(req.body);
+    newReply.created_on = new Date().toUTCString();
+    newReply.reported = false;
+    
+    Thread.findByIdAndUpdate(
+      req.body.thread_id,
+      {$push: {replies: newReply}, bumped_on: new Date().toUTCString()},
+      {new: true},
+      (err, updatedThread) => {
+        if(!err && updatedThread) {
+          res.redirect('/b/'+ updatedThread.board + '/' + updatedThread.id + '?new_reply_id=' + newReply.id)
+        }
+      }
+    );
+  });
+
+  app.get('/api/threads/:board', (req, res) => {
+
+    Thread.find({board: req.params.board})
+      .sort({bumped_on: 'desc'})
+      .limit(10)
+      .select('-delete_password')
+      .lean()
+      .exec((err, arrayOfThreads) => {
+        if(!err && arrayOfThreads) {
+          arrayOfThreads.forEach((thread) => {
+            
+            thread['replycount'] = thread.replies.length;
+
+            thread.replies.sort((thread1, thread2) => {
+              return thread2.created_on - thread1.created_on;
+            });
+
+            thread.replies = thread.replies.slice(0, 3);
+
+            thread.replies.forEach((reply) => {
+              reply.delete_password = undefined;
+            });
+          });
+          return res.json(arrayOfThreads);
+        }
+      });
+
+  });
+
+
   //app.route('/api/threads/:board');
     
   //app.route('/api/replies/:board');
