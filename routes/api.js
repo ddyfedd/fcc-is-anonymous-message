@@ -31,8 +31,27 @@ module.exports = function (app) {
   let Reply = mongoose.model('Reply', replySchema);
   let Thread = mongoose.model('Thread', threadSchema);
   
-  app.route('/api/threads/:board');
+  app.post('/api/threads/:board', (req, res) => {
+    let newThread = new Thread(req.body);
     
-  app.route('/api/replies/:board');
+    if(!newThread.board || newThread.board === '') {
+      newThread.board = req.params.board;
+    }
+
+    newThread.created_on = new Date().toUTCString();
+    newThread.bumped_on = new Date().toUTCString();
+    newThread.reported = false;
+    newThread.replies = [];
+
+    newThread.save((err, savedThread) => {
+      if(!err && savedThread) {
+        return res.redirect('/b/' + savedThread.board + '/' + savedThread.id);
+      }
+    });
+  });
+  
+  //app.route('/api/threads/:board');
+    
+  //app.route('/api/replies/:board');
 
 };
