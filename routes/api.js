@@ -37,12 +37,13 @@ module.exports = function (app) {
     if(!newThread.board || newThread.board === '') {
       newThread.board = req.params.board;
     }
-
+    
     newThread.created_on = new Date().toUTCString();
     newThread.bumped_on = new Date().toUTCString();
     newThread.reported = false;
     newThread.replies = [];
 
+    console.log(newThread);
     newThread.save((err, savedThread) => {
       if(!err && savedThread) {
         return res.redirect('/b/' + savedThread.board + '/' + savedThread.id);
@@ -72,7 +73,7 @@ module.exports = function (app) {
     Thread.find({board: req.params.board})
       .sort({bumped_on: 'desc'})
       .limit(10)
-      .select('-delete_password')
+      .select('-delete_password -reported')
       .lean()
       .exec((err, arrayOfThreads) => {
         if(!err && arrayOfThreads) {
@@ -88,14 +89,128 @@ module.exports = function (app) {
 
             thread.replies.forEach((reply) => {
               reply.delete_password = undefined;
+              reply.reported = undefined;
             });
           });
           return res.json(arrayOfThreads);
         }
       });
-
   });
 
+  app.get('/api/replies/:board', (req, res) => {
+    Thread.findById(
+      req.query.thread_id,
+      (err, thread) => {
+        if(!err && thread) {
+          thread.delete_password = undefined;
+          thread.reported = undefined;
+
+          thread.replies.sort((thread1, thread2) => {
+            return thread2.created_on - thread1.created_on;
+          });
+
+          thread.replies.forEach((reply) => {
+            reply.delete_password = undefined;
+            reply.reported = undefined;
+          });
+          return res.json(thread);
+        }
+      }
+    );
+  });
+
+  app.delete('/api/threads/:board', (req, res) => {
+    Thread.findById(
+      req.body.thread_id,
+      (err, threadToDelete) => {
+        if(!err && threadToDelete) {
+          
+          if(threadToDelete.delete_password === req.body.delete_password) {
+            Thread.findByIdAndRemove(
+              req.body.thread_id,
+              (err, deletedThread) => {
+                if(!err && deletedThread) {
+                  return res.json('success');
+                }
+              }
+            );
+          } else {
+            return res.json('incorrect password');
+          }
+
+        } else {
+          return res.json('Thread not found');        }
+      }
+    );
+  });
+
+  app.delete('/api/replies/:board', (req, res) => {
+    Thread.findById(
+      req.body.thread_id,
+      (err, threadToUpdate) => {
+        if(!err && threadToUpdate) {
+
+          for(let i = 0; i < threadToUpdate.replies.length; i++) {
+            if(threadToUpdate.replies[i].id === req.body.reply_id) {
+              if(threadToUpdate.replies[i].delete_password === req.body.delete_password) {
+                threadToUpdate.replies[i].text = '[deleted]';
+                
+              } else {
+                return res.json('incorrect password');
+              }
+            }
+          }
+
+          threadToUpdate.save((err, updatedThread) => {
+            if(!err && updatedThread) {
+              return res.json('success');
+            }
+          });
+
+        } else {
+          return res.json('Thread not found');
+        }
+      }
+    );
+  });
+
+  app.put('/api/threads/:board', (req, res) => {
+    Thread.findByIdAndUpdate(
+      req.body.thread_id,
+      {reported: true},
+      {new: true},
+      (err, updatedThread) => {
+        if(!err && updatedThread) {
+          return res.json('success');
+        }
+      }
+    );
+  });
+
+  app.put('/api/replies/:board', (req, res) => {
+    Thread.findById(
+      req.body.thread_id,
+      (err, threadToUpdate) => {
+        if(!err && threadToUpdate) {
+
+          for(let i = 0; i < threadToUpdate.replies.length; i++) {
+            if(threadToUpdate.replies[i].id === req.body.reply_id) {
+              threadToUpdate.replies[i].reported = true;
+            }
+          }
+
+          threadToUpdate.save((err, updatedThread) => {
+            if(!err && updatedThread) {
+              return res.json('success');
+            }
+          });
+
+        } else {
+          return res.json('Thread not found');
+        }
+      }
+    );
+  });
 
   //app.route('/api/threads/:board');
     
