@@ -43,7 +43,6 @@ module.exports = function (app) {
     newThread.reported = false;
     newThread.replies = [];
 
-    console.log(newThread);
     newThread.save((err, savedThread) => {
       if(!err && savedThread) {
         return res.redirect('/b/' + savedThread.board + '/' + savedThread.id);
