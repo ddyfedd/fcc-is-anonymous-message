@@ -72,7 +72,7 @@ module.exports = function (app) {
     Thread.find({board: req.params.board})
       .sort({bumped_on: 'desc'})
       .limit(10)
-      .select('-delete_password -reported')
+      .select()
       .lean()
       .exec((err, arrayOfThreads) => {
         if(!err && arrayOfThreads) {
